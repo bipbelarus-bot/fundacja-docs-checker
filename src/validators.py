@@ -25,11 +25,6 @@ def _basename(file_name: str) -> str:
 
 
 def check_identifiers(file_name: str, text: str, rules: dict) -> list[Finding]:
-    """Validate identifiers only when an actual identifier value is present.
-
-    A bare word such as "KRS" in phrases like "zgodnie z KRS" or "KRS-Z20"
-    is not treated as a missing registration number.
-    """
     findings: list[Finding] = []
     f = rules["fundacja"]
     patterns = {
@@ -57,9 +52,6 @@ def check_name(file_name: str, text: str, rules: dict) -> list[Finding]:
         return []
     if _norm(expected) in _norm(text):
         return [Finding(file_name, "fundacja_name", "OK", "Nazwa Fundacji zgodna z konfiguracją.")]
-
-    # Do not require the full legal name in every procedural document. Review
-    # only an explicit field that purports to state the foundation's name.
     explicit = re.search(r"(?im)^\s*(?:nazwa\s+fundacji|fundacja)\s*[:\-]\s*(.+?)\s*$", text)
     if explicit:
         return [Finding(file_name, "fundacja_name", "REVIEW", f"Jawnie podana nazwa wymaga weryfikacji: {explicit.group(1).strip()}")]
@@ -93,11 +85,8 @@ def check_seat_and_address(file_name: str, text: str, rules: dict) -> list[Findi
 
 
 def check_placeholders(file_name: str, text: str, rules: dict) -> list[Finding]:
-    # A checklist may quote placeholder syntax as an instruction rather than
-    # contain an unfilled operative field.
     if "CHECKLISTA" in _basename(file_name).upper():
         return []
-
     findings: list[Finding] = []
     for marker in rules.get("placeholders", []):
         if marker.lower() in text.lower():
@@ -108,48 +97,48 @@ def check_placeholders(file_name: str, text: str, rules: dict) -> list[Finding]:
 
 
 def check_board_resolution_reference(file_name: str, text: str, rules: dict) -> list[Finding]:
-    """Cross-check references to the known Zarząd resolution initiating the procedure."""
     f = rules.get("fundacja", {})
     expected_number = str(f.get("board_resolution_number", "")).strip()
     expected_date = str(f.get("board_resolution_date", "")).strip()
     if not expected_number and not expected_date:
         return []
-
     if not re.search(r"uchwa[łl](?:a|y|ę)\s+zarz[ąa]du", text, re.I):
         return []
 
     findings: list[Finding] = []
-    ref = re.search(
-        r"uchwa[łl](?:a|y|ę)\s+zarz[ąa]du(?:\s+fundacji)?\s+nr\s+([^\s,;]+(?:\s+UZUPEŁNIENIA\])?)",
-        text,
-        re.I,
-    )
-    if ref and expected_number:
-        found_number = ref.group(1).strip().rstrip(".")
-        if expected_number.lower() == found_number.lower():
-            findings.append(Finding(file_name, "board_resolution_reference", "OK", f"Numer uchwały Zarządu zgodny: {expected_number}"))
-        else:
-            findings.append(Finding(file_name, "board_resolution_reference", "ERROR", f"Numer uchwały Zarządu niespójny: '{found_number}', oczekiwano '{expected_number}'"))
+    if expected_number:
+        ref = re.search(r"uchwa[łl](?:a|y|ę)\s+zarz[ąa]du(?:\s+fundacji)?\s+nr\s+([^\s,;]+(?:\s+UZUPEŁNIENIA\])?)", text, re.I)
+        if ref:
+            found_number = ref.group(1).strip().rstrip(".")
+            status = "OK" if expected_number.lower() == found_number.lower() else "ERROR"
+            message = f"Numer uchwały Zarządu zgodny: {expected_number}" if status == "OK" else f"Numer uchwały Zarządu niespójny: '{found_number}', oczekiwano '{expected_number}'"
+            findings.append(Finding(file_name, "board_resolution_reference", status, message))
 
-    # Only compare the date when the reference explicitly says "z dnia ...".
-    date_ref = re.search(
-        r"uchwa[łl](?:a|y|ę)\s+zarz[ąa]du(?:\s+fundacji)?\s+nr\s+[^\n,;]+?\s+z\s+dnia\s+([^\n,;–-]+)",
-        text,
-        re.I,
-    )
-    if date_ref and expected_date:
-        found_date = date_ref.group(1).strip().rstrip(".")
-        accepted = {
-            _norm(expected_date.rstrip(".")),
-            "7.07.2026 r",
-            "07.07.2026 r",
-            "7.07.2026",
-            "07.07.2026",
-        }
-        if _norm(found_date) not in accepted:
-            findings.append(Finding(file_name, "board_resolution_date", "ERROR", f"Data uchwały Zarządu niespójna: '{found_date}', oczekiwano '{expected_date}'"))
+    if expected_date:
+        date_ref = re.search(r"uchwa[łl](?:a|y|ę)\s+zarz[ąa]du(?:\s+fundacji)?\s+nr\s+[^\n,;]+?\s+z\s+dnia\s+([^\n,;–-]+)", text, re.I)
+        if date_ref:
+            found_date = date_ref.group(1).strip().rstrip(".")
+            accepted = {_norm(expected_date.rstrip(".")), "7.07.2026 r", "07.07.2026 r", "7.07.2026", "07.07.2026"}
+            status = "OK" if _norm(found_date) in accepted else "ERROR"
+            message = f"Data uchwały Zarządu zgodna: {expected_date}" if status == "OK" else f"Data uchwały Zarządu niespójna: '{found_date}', oczekiwano '{expected_date}'"
+            findings.append(Finding(file_name, "board_resolution_date", status, message))
+    return findings
+
+
+def check_procedure_dates(file_name: str, text: str, rules: dict) -> list[Finding]:
+    """Check explicit references to the first Council meeting date."""
+    expected = str(rules.get("fundacja", {}).get("first_meeting_date", "")).strip()
+    if not expected:
+        return []
+    findings: list[Finding] = []
+    # Capture phrases such as: "zwołanie posiedzenia ... na dzień 6 października 2026 r."
+    match = re.search(r"zwołani[ea]\s+posiedzenia\s+Rady\s+Fundacji\s+na\s+dzień\s+([^\n.]+(?:2026\s*r\.?)?)", text, re.I)
+    if match:
+        found = match.group(1).strip().rstrip(".")
+        if _norm(found) != _norm(expected.rstrip(".")):
+            findings.append(Finding(file_name, "first_meeting_date", "ERROR", f"Niespójna data pierwszego posiedzenia: '{found}', oczekiwano '{expected}'"))
         else:
-            findings.append(Finding(file_name, "board_resolution_date", "OK", f"Data uchwały Zarządu zgodna: {expected_date}"))
+            findings.append(Finding(file_name, "first_meeting_date", "OK", f"Data pierwszego posiedzenia zgodna: {expected}"))
     return findings
 
 
@@ -175,7 +164,6 @@ def check_resolution_data(file_name: str, text: str) -> list[Finding]:
         elif not is_project:
             findings.append(Finding(file_name, "resolution_number", "REVIEW", "Dokument jest uchwałą, ale nie wykryto standardowego numeru."))
 
-    # Procedure/template documents do not need their own event date until used.
     is_template = (
         "PROCEDURA" in name.upper()
         or "DOKUMENT PROCEDURALNY" in head.upper()
@@ -210,6 +198,7 @@ def run_validations(file_name: str, text: str, rules: dict) -> list[Finding]:
     findings += check_seat_and_address(file_name, text, rules)
     findings += check_placeholders(file_name, text, rules)
     findings += check_board_resolution_reference(file_name, text, rules)
+    findings += check_procedure_dates(file_name, text, rules)
     findings += check_resolution_data(file_name, text)
     findings += check_statute_references(file_name, text)
     return findings
