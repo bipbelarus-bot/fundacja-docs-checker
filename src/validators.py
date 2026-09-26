@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass, asdict
-from pathlib import Path
 from typing import Any
 
 
@@ -28,10 +27,14 @@ def check_identifiers(file_name: str, text: str, rules: dict) -> list[Finding]:
         expected = str(f.get(key, "")).strip()
         if not expected:
             continue
-        if expected in text:
+        field_present = re.search(rf"\b{re.escape(label)}\b", text, re.I) is not None
+        value_present = expected in text
+        if not field_present and not value_present:
+            continue
+        if value_present:
             findings.append(Finding(file_name, label, "OK", f"Znaleziono poprawny {label}: {expected}"))
         else:
-            findings.append(Finding(file_name, label, "WARN", f"Nie znaleziono oczekiwanego {label}: {expected}"))
+            findings.append(Finding(file_name, label, "WARN", f"Dokument zawiera pole {label}, ale nie znaleziono oczekiwanej wartości: {expected}"))
     return findings
 
 
@@ -39,9 +42,12 @@ def check_name(file_name: str, text: str, rules: dict) -> list[Finding]:
     expected = rules["fundacja"].get("name", "").strip()
     if not expected:
         return []
-    if _norm(expected) in _norm(text):
+    normalized = _norm(text)
+    if _norm(expected) in normalized:
         return [Finding(file_name, "fundacja_name", "OK", "Nazwa Fundacji zgodna z konfiguracją.")]
-    return [Finding(file_name, "fundacja_name", "WARN", "Nie znaleziono pełnej oczekiwanej nazwy Fundacji.")]
+    if "fundacja" in normalized:
+        return [Finding(file_name, "fundacja_name", "REVIEW", "Dokument odnosi się do Fundacji, ale nie znaleziono pełnej skonfigurowanej nazwy.")]
+    return []
 
 
 def check_seat_and_address(file_name: str, text: str, rules: dict) -> list[Finding]:
@@ -49,12 +55,12 @@ def check_seat_and_address(file_name: str, text: str, rules: dict) -> list[Findi
     f = rules["fundacja"]
     seat = str(f.get("current_seat", "")).strip()
     address = str(f.get("current_address", "")).strip()
-    if seat:
+    normalized = _norm(text)
+    if seat and "siedzib" in normalized:
         findings.append(Finding(file_name, "seat", "OK" if seat.lower() in text.lower() else "WARN", f"Siedziba oczekiwana: {seat}"))
-    if address and "UZUPEŁNIJ" not in address.upper():
-        findings.append(Finding(file_name, "address", "OK" if _norm(address) in _norm(text) else "WARN", f"Adres oczekiwany: {address}"))
-    else:
-        findings.append(Finding(file_name, "address", "REVIEW", "Aktualny pełny adres nie jest jeszcze skonfigurowany."))
+    address_configured = bool(address) and "UZUPEŁNIJ" not in address.upper()
+    if address_configured and ("adres" in normalized or _norm(address) in normalized):
+        findings.append(Finding(file_name, "address", "OK" if _norm(address) in normalized else "REVIEW", f"Adres oczekiwany: {address}"))
     return findings
 
 
@@ -74,7 +80,6 @@ def check_resolution_data(file_name: str, text: str) -> list[Finding]:
         findings.append(Finding(file_name, "resolution_number", "OK", "Wykryto numer uchwały."))
     elif "uchwa" in text.lower():
         findings.append(Finding(file_name, "resolution_number", "REVIEW", "Dokument wygląda na uchwałę, ale nie wykryto standardowego numeru."))
-
     date_patterns = [r"\b\d{1,2}[.\-/]\d{1,2}[.\-/]\d{4}\b", r"\b\d{1,2}\s+[a-ząćęłńóśźż]+\s+\d{4}\s*r?\.?\b"]
     if any(re.search(p, text, re.I) for p in date_patterns):
         findings.append(Finding(file_name, "date", "OK", "Wykryto datę."))
