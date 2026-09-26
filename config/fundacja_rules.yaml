@@ -4,9 +4,11 @@ fundacja:
   nip: "5223309636"
   regon: "529550828"
   current_seat: "Wrocław"
-  current_address: "[UZUPEŁNIJ AKTUALNY PEŁNY ADRES]"
+  current_address: "ul. Leszczyńskiego 4 lok. 29, 50-078 Wrocław"
   board_president: "Vadim Dmitrenok"
   council_members_expected_currently: 2
+  board_resolution_number: "7.07.2026"
+  board_resolution_date: "7 lipca 2026 r."
 
 checks:
   identifiers:
@@ -21,6 +23,7 @@ checks:
     - dates
     - statute_references
     - placeholders
+    - board_resolution_reference
   legal_review_flags:
     - council_minimum_size
     - quorum
