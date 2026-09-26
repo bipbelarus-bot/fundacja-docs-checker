@@ -102,12 +102,15 @@ def check_board_resolution_reference(file_name: str, text: str, rules: dict) -> 
     expected_date = str(f.get("board_resolution_date", "")).strip()
     if not expected_number and not expected_date:
         return []
-    if not re.search(r"uchwa[łl](?:a|y|ę)\s+zarz[ąa]du", text, re.I):
+
+    # Polish case forms: Uchwała, Uchwały, Uchwałę, Uchwale, Uchwałą.
+    uchwala_form = r"uchwa[łl](?:a|y|ę|e|ą)"
+    if not re.search(rf"{uchwala_form}\s+zarz[ąa]du", text, re.I):
         return []
 
     findings: list[Finding] = []
     if expected_number:
-        ref = re.search(r"uchwa[łl](?:a|y|ę)\s+zarz[ąa]du(?:\s+fundacji)?\s+nr\s+([^\s,;]+(?:\s+UZUPEŁNIENIA\])?)", text, re.I)
+        ref = re.search(rf"{uchwala_form}\s+zarz[ąa]du(?:\s+fundacji)?\s+nr\s+([^\s,;]+(?:\s+UZUPEŁNIENIA\])?)", text, re.I)
         if ref:
             found_number = ref.group(1).strip().rstrip(".")
             status = "OK" if expected_number.lower() == found_number.lower() else "ERROR"
@@ -115,7 +118,7 @@ def check_board_resolution_reference(file_name: str, text: str, rules: dict) -> 
             findings.append(Finding(file_name, "board_resolution_reference", status, message))
 
     if expected_date:
-        date_ref = re.search(r"uchwa[łl](?:a|y|ę)\s+zarz[ąa]du(?:\s+fundacji)?\s+nr\s+[^\n,;]+?\s+z\s+dnia\s+([^\n,;–-]+)", text, re.I)
+        date_ref = re.search(rf"{uchwala_form}\s+zarz[ąa]du(?:\s+fundacji)?\s+nr\s+[^\n,;]+?\s+z\s+dnia\s+([^\n,;–-]+)", text, re.I)
         if date_ref:
             found_date = date_ref.group(1).strip().rstrip(".")
             accepted = {_norm(expected_date.rstrip(".")), "7.07.2026 r", "07.07.2026 r", "7.07.2026", "07.07.2026"}
@@ -126,12 +129,10 @@ def check_board_resolution_reference(file_name: str, text: str, rules: dict) -> 
 
 
 def check_procedure_dates(file_name: str, text: str, rules: dict) -> list[Finding]:
-    """Check explicit references to the first Council meeting date."""
     expected = str(rules.get("fundacja", {}).get("first_meeting_date", "")).strip()
     if not expected:
         return []
     findings: list[Finding] = []
-    # Capture phrases such as: "zwołanie posiedzenia ... na dzień 6 października 2026 r."
     match = re.search(r"zwołani[ea]\s+posiedzenia\s+Rady\s+Fundacji\s+na\s+dzień\s+([^\n.]+(?:2026\s*r\.?)?)", text, re.I)
     if match:
         found = match.group(1).strip().rstrip(".")
