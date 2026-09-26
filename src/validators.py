@@ -76,11 +76,34 @@ def check_placeholders(file_name: str, text: str, rules: dict) -> list[Finding]:
 
 def check_resolution_data(file_name: str, text: str) -> list[Finding]:
     findings: list[Finding] = []
-    if re.search(r"uchwa[łl]a\s+(?:nr\s*)?\d+[/\-]\d{2,4}", text, re.I):
-        findings.append(Finding(file_name, "resolution_number", "OK", "Wykryto numer uchwały."))
-    elif "uchwa" in text.lower():
-        findings.append(Finding(file_name, "resolution_number", "REVIEW", "Dokument wygląda na uchwałę, ale nie wykryto standardowego numeru."))
-    date_patterns = [r"\b\d{1,2}[.\-/]\d{1,2}[.\-/]\d{4}\b", r"\b\d{1,2}\s+[a-ząćęłńóśźż]+\s+\d{4}\s*r?\.?\b"]
+
+    # Numer uchwały sprawdzamy tylko wtedy, gdy sam dokument wygląda jak uchwała.
+    # Samo wspomnienie słowa „uchwała” w protokole, checkliście czy załączniku
+    # nie powinno generować REVIEW.
+    name = file_name.rsplit("/", 1)[-1]
+    head = text[:2500]
+    is_resolution = bool(
+        re.search(r"(?:^|[_\-\s])UCHWA[ŁL]A(?:[_\-\s.]|$)", name, re.I)
+        or re.search(r"^\s*UCHWA[ŁL]A\b", head, re.I | re.M)
+        or re.search(r"\bUCHWA[ŁL]A\s+(?:RADY|ZARZ[ĄA]DU|FUNDATOR(?:A|ÓW)?|NR)\b", head, re.I)
+    )
+
+    if is_resolution:
+        number_patterns = [
+            r"\buchwa[łl]a\s+(?:nr\s*)?[A-Za-z]*\s*\d+[A-Za-z]?(?:[/\-]\d+){1,3}\b",
+            r"\bnr\s+\d+[A-Za-z]?(?:[/\-]\d+){1,3}\b",
+        ]
+        if any(re.search(p, head, re.I) for p in number_patterns):
+            findings.append(Finding(file_name, "resolution_number", "OK", "Wykryto numer uchwały."))
+        else:
+            findings.append(Finding(file_name, "resolution_number", "REVIEW", "Dokument jest uchwałą, ale nie wykryto standardowego numeru."))
+
+    months = r"(?:stycznia|lutego|marca|kwietnia|maja|czerwca|lipca|sierpnia|wrze[śs]nia|pa[źz]dziernika|listopada|grudnia)"
+    date_patterns = [
+        r"\b\d{1,2}[.\-/]\d{1,2}[.\-/]\d{4}\b",
+        rf"\b\d{{1,2}}\s+{months}\s+\d{{4}}(?:\s*r(?:oku)?\.?|\s*roku)?\b",
+        r"\b\d{4}[.\-/]\d{1,2}[.\-/]\d{1,2}\b",
+    ]
     if any(re.search(p, text, re.I) for p in date_patterns):
         findings.append(Finding(file_name, "date", "OK", "Wykryto datę."))
     else:
