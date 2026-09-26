@@ -1,0 +1,41 @@
+fundacja:
+  name: "Fundacja Białoruskich Więźniów Politycznych w Polsce"
+  krs: "0001124588"
+  nip: "5223309636"
+  regon: "529550828"
+  current_seat: "Wrocław"
+  current_address: "[UZUPEŁNIJ AKTUALNY PEŁNY ADRES]"
+  board_president: "Vadim Dmitrenok"
+  council_members_expected_currently: 2
+
+checks:
+  identifiers:
+    - krs
+    - nip
+    - regon
+  consistency:
+    - fundacja_name
+    - seat
+    - address
+    - resolution_numbers
+    - dates
+    - statute_references
+    - placeholders
+  legal_review_flags:
+    - council_minimum_size
+    - quorum
+    - voting_majority
+    - meeting_notice_period
+    - authority_to_amend_statute
+    - authority_to_set_address
+
+placeholders:
+  - "[UZUPEŁNIJ]"
+  - "[DO UZUPEŁNIENIA]"
+  - "[___]"
+  - "TBD"
+  - "TODO"
+
+notes:
+  - "Quorum i liczebność Rady muszą być sprawdzane względem aktualnego Statutu."
+  - "Zmiana miasta siedziby może wymagać zmiany Statutu; zmiana samej ulicy/lokalu zależy od treści Statutu i kompetencji organów."
