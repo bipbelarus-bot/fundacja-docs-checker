@@ -7,9 +7,7 @@ fundacja:
   current_address: "ul. Leszczyńskiego 4 lok. 29, 50-078 Wrocław"
   board_president: "Vadim Dmitrenok"
   council_members_expected_currently: 2
-  # Numer uchwały Zarządu nie jest jeszcze ustalony w dokumencie źródłowym nr 01.
-  # Nie przyjmujemy arbitralnie jednego z wariantów 7.07.2026 / 7/07/2026.
-  board_resolution_number: ""
+  board_resolution_number: "7/07/2026"
   board_resolution_date: "7 lipca 2026 r."
   first_meeting_date: "30 lipca 2026 r."
 
@@ -46,4 +44,4 @@ placeholders:
 notes:
   - "Quorum i liczebność Rady muszą być sprawdzane względem aktualnego Statutu."
   - "Zmiana miasta siedziby może wymagać zmiany Statutu; zmiana samej ulicy/lokalu zależy od treści Statutu i kompetencji organów."
-  - "Numer uchwały Zarządu inicjującej procedurę pozostaje do ustalenia na podstawie dokumentu źródłowego nr 01; nie normalizować go bez decyzji Fundacji."
+  - "Numer uchwały Zarządu inicjującej procedurę ustalono jako 7/07/2026; wszystkie odwołania w pakiecie powinny być z nim spójne."
